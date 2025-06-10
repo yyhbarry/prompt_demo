@@ -1,1 +1,1 @@
-This progress is really simple，just for TCM_doctor and let them to learn prompt engineering
+This progress is really simple，just wanna give TCM_doctors a chance to learn about prompt engineering
