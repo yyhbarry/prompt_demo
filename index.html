@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中医提问演示</title>
+    <style>
+        /* --- 全局和基础样式 (移动端优先) --- */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f4f7f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            padding: 25px;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            font-size: 1.5em;
+            margin-bottom: 25px;
+        }
+
+        .question-box {
+            background-color: #eaf2f8;
+            border-left: 5px solid #3498db;
+            padding: 15px 20px;
+            margin-bottom: 30px;
+            border-radius: 5px;
+        }
+
+        .question-box p {
+            margin: 0;
+            font-size: 1.1em;
+            color: #2c3e50;
+        }
+
+        /* --- 选项按钮样式 --- */
+        .options-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px; /* 按钮之间的间距 */
+        }
+
+        .prompt-btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            text-align: left;
+            transition: background-color 0.3s, transform 0.2s;
+            width: 100%;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .prompt-btn:hover:not(:disabled) {
+            background-color: #2980b9;
+        }
+
+        .prompt-btn:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+
+        .prompt-btn.good-prompt {
+            background-color: #27ae60;
+        }
+
+        .prompt-btn.good-prompt:hover:not(:disabled) {
+            background-color: #229954;
+        }
+
+        .prompt-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .prompt-btn strong {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+
+        /* --- 加载和响应区域 --- */
+        .response-container {
+            margin-top: 30px;
+            border-top: 1px solid #e0e0e0;
+            padding-top: 20px;
+        }
+
+        #loader {
+            display: none; /* 默认隐藏 */
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #3498db;
+            animation: spin 1s ease infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #response-content {
+            background-color: #fafafa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            white-space: pre-wrap; /* 保持换行和空格 */
+            word-wrap: break-word; /* 长单词自动换行 */
+            line-height: 1.7;
+            min-height: 100px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+            color: #333;
+        }
+
+        /* --- 响应式设计 (PC端) --- */
+        @media (min-width: 768px) {
+            .container {
+                padding: 40px;
+            }
+            h1 {
+                font-size: 2em;
+            }
+            .options-container {
+                flex-direction: row; /* 在大屏幕上并排显示 */
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>中医提问效果演示</h1>
+
+        <div class="question-box">
+            <p>现在假设您要了解一下颤振病的中医机制，您要如何提问呢？</p>
+        </div>
+
+        <div class="options-container">
+            <button class="prompt-btn" id="bad-prompt-btn">
+                <strong>方式一：随意提问</strong>
+            </button>
+            <button class="prompt-btn good-prompt" id="good-prompt-btn">
+                <strong>方式二：利用提示词工程</strong>
+            </button>
+        </div>
+
+        <div class="response-container">
+            <div id="loader">
+                <div class="spinner"></div>
+                <p>正在生成回答...</p>
+            </div>
+            <pre id="response-content">AI的回答将显示在这里...</pre>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const badPromptBtn = document.getElementById('bad-prompt-btn');
+            const goodPromptBtn = document.getElementById('good-prompt-btn');
+            const responseContent = document.getElementById('response-content');
+            const loader = document.getElementById('loader');
+
+            // 定义两个固定的回答
+            // 使用反引号 (`) 来方便地输入多行文本
+            const fixedResponses = {
+                bad: `颤振病，又称震颤麻痹或帕金森病，在中医学中属于“痉证”、“颤证”范畴。中医认为，颤振病的发病机制与以下几方面有关：
+
+1.  **肝风内动**：中医学认为，肝主筋，筋脉柔和则运动正常。若肝阴不足，不能制约肝阳，导致肝阳上亢，肝风内动，从而出现肢体颤动等症状。
+
+2.  **肾精不足**：肾藏精，主骨生髓，肾精不足则不能滋养脑髓，筋骨失养，导致肢体颤动、僵硬等症状。
+
+3.  **心血不足**：心主血脉，心血不足则心神失养，出现心悸、失眠等症状，同时也会影响筋脉，导致肢体颤动。
+
+4.  **风痰阻络**：中医认为，痰湿内生，阻滞经络，影响气血运行，导致风痰阻络，从而出现肢体颤动、麻木等症状。
+
+5.  **气血两虚**：气为血之帅，血为气之母。气血不足，不能濡养筋脉，导致筋脉失养，出现肢体颤动等症状。
+
+6.  **痰火扰心**：痰火内生，上扰心神，影响心主血脉的功能，也会出现肢体颤动等症状。
+
+综上所述，颤振病的中医机制涉及多个方面，主要包括肝风内动、肾精不足、心血不足、风痰阻络、气血两虚和痰火扰心等。治疗时应根据患者的具体症状和体质，辨证施治，采取相应的中药、针灸等方法进行治疗。`,
+                good: `## 颤振病：中医视角下的帕金森病
+
+颤振病，即西医中的帕金森病，是一种常见的神经系统变性疾病。在中医理论中，我们将其病因病机归纳为脏腑功能失调和病理产物的累积。以下将从“肝、脾、肾”三脏功能失调以及“风、火、痰、瘀”等病理产物如何导致颤振进行阐述。
+
+### 一、脏腑亏虚的“本”
+
+1.  **肝**
+    在中医理论中，肝主疏泄，调畅情志。肝功能失调，会导致肝气郁结，进而引发“肝风内动”。这可以比喻为一场风暴在体内掀起，使得身体不由自主地颤抖。
+    -   *肝风内动*：可以想象成风吹树叶摇曳，体内风动则导致肢体颤动。
+
+2.  **脾**
+    脾主运化，为气血生化之源。脾功能失调会导致气血不足，不能濡养四肢，从而引发肢体颤抖。
+    -   *脾虚湿盛*：如同土壤贫瘠，无法滋养植物，导致肢体失去濡养而颤抖。
+
+3.  **肾**
+    肾为先天之本，主藏精。肾精不足，不能滋养肝木，导致肝阳上亢，也会引发颤振。
+    -   *肾精不足*：如同水源枯竭，无法滋养大地，导致肝木失去滋养，从而引发颤抖。
+
+### 二、病理产物的“标”
+
+1.  **风**
+    在中医中，“风”是一种病理产物，与肝功能失调密切相关。肝风内动，会导致肢体颤抖。
+    -   *风动痰生*：风如同搅拌器，使得体内的津液变成痰，引发颤抖。
+
+2.  **火**
+    火邪内生，会灼伤阴液，导致筋脉失养，从而引发颤振。
+    -   *火邪伤阴*：如同烈日炙烤大地，使水分蒸发，导致筋脉失去濡养而颤抖。
+
+3.  **痰**
+    痰邪内生，阻络筋脉，使气血运行不畅，引发颤振。
+    -   *痰热动风*：痰如同胶水，使筋脉粘连，影响气血运行，导致颤抖。
+
+4.  **瘀**
+    瘀血阻络，气血运行不畅，筋脉失养，也会导致颤振。
+    -   *瘀血阻络*：如同道路堵塞，使气血无法顺畅通行，导致肢体颤抖。
+
+综上所述，颤振病在中医理论中的病因病机主要涉及肝、脾、肾三脏功能失调，以及风、火、痰、瘀等病理产物的累积。了解这些病因病机，有助于我们从中医角度认识并防治帕金森病。希望这篇文章能为您带来启示和帮助。`
+            };
+
+            // 用于防止在打字时重复点击
+            let isTyping = false;
+
+            // 为按钮添加点击事件
+            badPromptBtn.addEventListener('click', () => {
+                displayFixedResponse('bad');
+            });
+
+            goodPromptBtn.addEventListener('click', () => {
+                displayFixedResponse('good');
+            });
+
+            /**
+             * 实现打字机效果的函数
+             * @param {string} text - 要显示的文本
+             * @param {HTMLElement} element - 显示文本的HTML元素
+             * @param {number} speed - 打字速度 (毫秒)
+             * @param {function} onComplete - 打字完成后的回调函数
+             */
+            function typeWriter(text, element, speed, onComplete) {
+                let i = 0;
+                element.innerHTML = ''; // 清空之前的内容
+
+                function type() {
+                    if (i < text.length) {
+                        // 为了正确渲染Markdown的换行，我们直接添加字符
+                        element.innerHTML += text.charAt(i);
+                        i++;
+                        setTimeout(type, speed);
+                    } else if (onComplete) {
+                        onComplete(); // 打字结束后执行回调
+                    }
+                }
+                type();
+            }
+
+            function displayFixedResponse(responseKey) {
+                // 如果正在打字，则不执行任何操作
+                if (isTyping) return;
+                isTyping = true;
+
+                // 禁用按钮，防止重复点击
+                badPromptBtn.disabled = true;
+                goodPromptBtn.disabled = true;
+
+                // 显示加载动画，并隐藏上次的回答
+                loader.style.display = 'block';
+                responseContent.style.display = 'none';
+
+                const textToType = fixedResponses[responseKey];
+                const typingSpeed = 25; // 打字速度，单位毫秒，可以调整
+
+                // 模拟网络延迟和处理时间
+                setTimeout(() => {
+                    // 隐藏加载动画，准备开始打字
+                    loader.style.display = 'none';
+                    responseContent.style.display = 'block';
+
+                    // 调用打字机函数
+                    typeWriter(textToType, responseContent, typingSpeed, () => {
+                        // 打字完成后，重新启用按钮
+                        badPromptBtn.disabled = false;
+                        goodPromptBtn.disabled = false;
+                        isTyping = false; // 重置状态
+                    });
+                }, 500); // 0.5秒的模拟延迟
+            }
+        });
+    </script>
+</body>
+</html>
